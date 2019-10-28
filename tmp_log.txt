@@ -1,0 +1,23 @@
+user config:
+env ./log_point/pointnet
+model PointBoxNet
+use_gpu True
+cuda_idx 0
+root /hdd/you/rgbd-det/
+load_model_path None
+batch_size 32
+batch_size_val 32
+batch_size_test 1
+num_workers 1
+print_freq 1000
+plot_freq 100
+result_file det_3d.txt
+max_epoch 300
+lr 0.001
+lr_decay 0.5
+momentum 0.5
+momentum_dec_rate 0.5
+weight_decay 0.0001
+white_list ['Car', 'Pedestrian', 'Cyclist']
+save_model True
+parse <bound method parse of <config_point.ConfigPoint object at 0x7f2fcbbf2eb8>>
