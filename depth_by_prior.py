@@ -3,9 +3,13 @@ import cv2
 import os,math
 # from scipy.optimize import leastsq
 from PIL import Image
-from matplotlib import pyplot as plt
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 cbox = np.array([[0,70.4],[-40,40],[-3,2]])
+y_ct_mean_dict =  {'Car': 0.9467262795309836}
 
 # read_lable_by_path
 def read_label(label_filename): # 传入label文件名
@@ -83,10 +87,13 @@ class Calibration(object): # 传入标定文件名
         Ref (KITTI paper): http://www.cvlibs.net/publications/Geiger2013IJRR.pdf
         TODO(rqi): do matrix multiplication only once for each projection.
     '''
-    def __init__(self, calib_filepath):
+    def __init__(self, calib_filepath, is_cam_2=True):
         calibs = self.read_calib_file(calib_filepath) # core func
         # Projection matrix from rect camera coord to image2 coord
-        self.P = calibs['P2']
+        if is_cam_2:
+            self.P = calibs['P2']
+        else:
+            self.P = calibs['P3']
         self.P = np.reshape(self.P, [3,4])
         # Rigid transform from Velodyne coord to reference camera coord
         self.V2C = calibs['Tr_velo_to_cam']
@@ -297,6 +304,7 @@ if __name__ == "__main__":
     idx_all = idx_fig.readlines() # all idx
     idx_fig.close()
 
+    xyz_ct_diff_all = np.empty([0,3])
     count_idx = 0
     for idx in idx_all:
         idx = idx.rstrip()
@@ -309,18 +317,21 @@ if __name__ == "__main__":
         xyz_ct = [] # center
         uv_ct = []
         for obj in objs:
-            if obj.type in ["Car"]: # "Cyclist", "Pedsetrian"
+            if obj.type in ['Car']: # "Cyclist", "Pedsetrian"
                 uv_ct.append([(obj.xmin+obj.xmax)/2, (obj.ymin+obj.ymax)/2])
                 xyz_bt.append(obj.t)
                 xyz_ct.append([obj.t[0], obj.t[1]-obj.h/2, obj.t[2]])
-        if len(uv_ct) <=0:
+        n_uv_ct = len(uv_ct)
+        if n_uv_ct <=0:
             continue
-        y_ct = np.array([[tmp[1]] for tmp in xyz_ct]) # n*1 2d
+        # y_ct = np.array([[tmp[1]] for tmp in xyz_ct]) # n*1 2d real value of y
+        y_ct = np.full((n_uv_ct,1), y_ct_mean_dict['Car']) # mean value of y
         # print(np.array(y_ct))
         xyz_ct_proj = calib.project_uv_to_rect_with_y(np.array(uv_ct), y_ct)
         xyz_ct_diff = xyz_ct - xyz_ct_proj
         xyz_ct_diff[:,1] = y_ct[:,0]
-        print(xyz_ct_diff)
+        # print(xyz_ct_diff)
+        xyz_ct_diff_all = np.append(xyz_ct_diff_all, xyz_ct_diff, axis=0)
 
         # uv_bt = calib.project_rect_to_image(np.array(xyz_bt))
         # y_bt = [[tmp[1]] for tmp in xyz_bt]
@@ -329,5 +340,23 @@ if __name__ == "__main__":
         # print(xyz_bt_diff)
 
         # count_idx += 1
-        # if count_idx % 1000 == 0:
+        # if count_idx % 3 == 0:
         #     break
+
+    # y_ct_mean = np.mean(xyz_ct_diff_all[:,1])
+    # print('y_ct_mean', y_ct_mean)
+    # fig = plt.figure(1)
+    x_dim = [i for i in range(xyz_ct_diff_all.shape[0])]
+    # plt.hist(xyz_ct_diff_all[:,0],bins=160)
+    plt.ylim(-30,30)
+    plt.scatter(x_dim, xyz_ct_diff_all[:,0],linewidths=1)
+    save_path = 'save_img/all_ct_x.png'
+    plt.savefig(save_path)
+    plt.cla()
+    # plt.hist(xyz_ct_diff_all[:,2],bins=160)
+    plt.ylim(-40,40)
+    plt.scatter(x_dim, xyz_ct_diff_all[:,2],linewidths=1)
+    save_path = 'save_img/all_ct_z.png'
+    plt.savefig(save_path)
+    plt.cla()
+    # plt.show()
